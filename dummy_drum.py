@@ -1,8 +1,4 @@
-# Original code by Mark Orchard-Webb,
-# Tweaked by:
-#            Robert Turner, 2019.12.09
-#            Rigel Zifkin, 2020.08.09
-# This code needs comments and probably scrubbing.
+# Dummy Control code for testing the raw calls.
 
 import serial
 import threading

@@ -1,7 +1,7 @@
 # Safe control code
 # Written by Rigel Zifkin 2020-08-09
 
-# import drum
+# import drum # For real use
 import dummy_drum as drum # For Testing
 import numpy as np
 import time
