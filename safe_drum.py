@@ -1,20 +1,20 @@
 # Safe control code
 # Written by Rigel Zifkin 2020-08-09
 
-# import drum # For real use
-import dummy_drum as drum # For Testing
+import drum # For real use
+#import dummy_drum as drum # For Testing
 import numpy as np
 import time
 from datetime import datetime
 
 #TODO Determine these values.
-ANG_MAX_STEPS = 360 # Number of steps that make a full circle
+ANG_MAX_STEPS = 720 # Number of steps that make a full circle
 ANG_MIN_STEPS = 0 # Initial steps in case we want a specific physical angle to be 0 in the future.
 
-RAD_MAX_STEPS = 12000 # Number of steps from the center to corner of plate
+RAD_MAX_STEPS = 10940 # Number of steps from the center to corner of plate
 # Since we're on a square. If the sensor is all the way in a corner, rotating
 # may result in a collision, so we need to be aware of these bounds.
-RAD_MAX_SAFE  = 10000 # Number of steps from center to edge of plate
+RAD_MAX_SAFE  = 8100 # Number of steps from center to edge of plate
 RAD_MIN_STEPS = 0 # Initial steps in case we want a specific radius to be 0.
 
 # By convention any time both positions are used in a single line
@@ -131,9 +131,10 @@ class SafePlate(drum.Vibrating_Plate):
         # If the radius is outside the safe range and we're rotating
         # we need to first pull in the sensor, then do the rotation
         # and finally set the radius to the correct amount.
-        if (ang_delta != 0 and self.radial > RAD_MAX_SAFE):
+        safe_dists = squine(np.linspace(self.angular,ang_steps,np.abs(self.angular-ang_steps)+1,dtype=int))
+        safe_dist = np.min(safe_dists)
+        if (ang_delta != 0 and self.radial > safe_dist):
             retreat = True
-            ang_first = True
         # If we're moving outside the safe radial distance, we want to rotate first.
         if (rad_steps > RAD_MAX_SAFE):
             ang_first = True
@@ -143,10 +144,7 @@ class SafePlate(drum.Vibrating_Plate):
             self.debug_print("Retreating radius for rotation by %d steps" % ang_delta)
             # If the target radius is within the safe limit, go there
             # otherwise, move to the minimum safe distance.
-            if rad_steps < RAD_MAX_SAFE:
-                self.rad_move_abs(rad_steps)
-            else:
-                self.rad_move_abs(RAD_MAX_SAFE)
+            self.rad_move_abs(safe_dist)
         # Calculate number of steps needed to move radially.
         # Put here since retreating will change this.
         rad_delta = rad_steps - self.radial
@@ -196,7 +194,7 @@ class SafePlate(drum.Vibrating_Plate):
         Parameters
         ----------
         steps : int
-            The position in steps, relative to zero to move the radial position to.
+            The position in steps, relative to zerodrum to move the radial position to.
         """
         self.move_abs(steps, self.angular)
 
@@ -247,6 +245,9 @@ class SafePlate(drum.Vibrating_Plate):
 
 # For a given angle theta, max radial position is squine(theta)
 # Here's a function for getting that as a function of angular steps
+# Not good enough since the sensor has some width to it.
+# For now gonna try multiplying by 0.94 + 0.06 * cos^2(theta)
+# To smoothly go through each regime.
 def squine(angular):
     """Calculates the absolute maximum radius for a given angular (in steps) position.
        This is effectively the distance between the center of a square and it's perimiter
@@ -266,15 +267,22 @@ def squine(angular):
         collide with the walls.
     """
     theta = (angular/ANG_MAX_STEPS) * 2 * np.pi
+    multiple = (0.91 + 0.09 * np.cos(2*theta)**2) * RAD_MAX_SAFE
     # Don't care about divide by zero within the following math
     with np.errstate(divide='ignore'):
-        return RAD_MAX_SAFE * np.min(np.abs([1/np.cos(theta), 1/np.sin(theta)]))
+        return  multiple * np.min(np.abs([1/np.cos(theta), 1/np.sin(theta)]), axis=0)
 
 # Testing will remove
 if __name__ == "__main__":
     drum = SafePlate()
+    for i in range(0,365,5):
+        print(i)
+        drum.move_abs(squine(i),i)
+    drum.move_abs(0,0)
+"""
+    
     # Set position to 0, 0
-    drum.home()
+    #drum.home()
     # Testing basic moves
     drum.move_abs(100,100)
     drum.move_abs(200,200)
@@ -299,3 +307,4 @@ if __name__ == "__main__":
 
     drum.move_abs(300,0)
     drum.radial_set(0.1)
+"""
