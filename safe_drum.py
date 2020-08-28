@@ -22,9 +22,7 @@ RAD_MIN_STEPS = 0 # Initial steps in case we want a specific radius to be 0.
 class SafePlate(drum.Vibrating_Plate):
     def __init__(self, debug=True):
         super().__init__(debug)
-        # When initalized try to read the previous position.
-        self.radial, self.angular = self.read_position()
-
+        self.home()
 
     def write_position(self):
         """ Writes the position to a file (position.csv) with a date and time.
@@ -59,18 +57,19 @@ class SafePlate(drum.Vibrating_Plate):
 
     def home(self):
         """ Moves the radius and angular motor backwards until they hit the limit switches.
-            This defines the (0,0) position of the scanner. 
+            This defines the minimal position of the scanner along both axes.
         """
-        #rad_stop, ang_stop = self.read_limits()
-        #while not (rad_stop and ang_stop):
-        #   if not rad_stop:
-                ## Decriment Radial by x steps
-        #   if not ang_stop:
-                ## Decriment Angular by x steps
-        #   rad_stop, ang_stop = self.read_limits()
-        #
+        print("Homing Instrument, please wait")
+        self.angular_home()
+        self.radial_home()
+        idx = 0
+        while(not (self.angular_idle or self.radial_idle)):
+            time.sleep(0.1)
+            char = ['-',"\\",'|','/'][idx % 4]
+            print(char, end='\r')
         self.radial = RAD_MIN_STEPS
         self.angular = ANG_MIN_STEPS
+        print("Done Homing")
 
     def read_limits(self):
         """Reads the status of the radial and angular limit switch.
@@ -79,7 +78,7 @@ class SafePlate(drum.Vibrating_Plate):
         -------
         bool, bool
             Status of the radial and limit switch respectively.
-            True indicates that the switch is depressed.
+            True indicat/ies that the switch is depressed.
         """
         #TODO
         return False,False
@@ -163,7 +162,6 @@ class SafePlate(drum.Vibrating_Plate):
         if rad_delta != 0:
             self.radial_go(rad_delta)
 
-        #TODO Monitor Limit Switches while moving
         # Wait for all movement to stop.
         while not (self.radial_idle() and self.angular_idle()):
             time.sleep(0.1)

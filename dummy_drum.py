@@ -63,3 +63,9 @@ class Vibrating_Plate:
     def debug_print(self, message):
         if self.debug:
             print(message)
+
+    def angular_home(self):
+        time.sleep(0.1)
+
+    def radial_home(self):
+        time.sleep(0.1)

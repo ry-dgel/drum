@@ -80,60 +80,6 @@ class Vibrating_Plate:
             if 0 == rc : return resp
             print(b"Unmatched: %s" % (resp),)
 
-    # Play white noise
-    def noise(self):
-        self.handle.write(b"noise\n")
-        self.wait_for(b"noise")        
-    
-    # Stop all playing sound
-    def silent(self):
-        self.handle.write(b"silent\n")
-        self.wait_for(b"silent")        
-
-    # Play a sinewave at the given frequency
-    def sine(self,freq):
-        command = b"sine %f\n" % (freq)
-        self.handle.write(command)
-        resp = self.wait_for(b"sine")
-        return float(resp.replace(b"sine ",b""))
-
-    # Not sure, need to test
-    def set_harmonic(self,harmonic):
-        if int != type(harmonic):
-            raise TypeError
-        if harmonic < 1:
-            raise ValueError
-        command = b"harmonic %d\n" % (harmonic)
-        self.handle.write(command)
-        resp = self.wait_for(b"harmonic")
-        return float(resp.replace(b"harmonic ",b""))
-
-    # Set the windowing length for lockin measurements.
-    # i.e. how long the measurement occurs for.
-    # Typically, want it to be a few multiples of 1/f
-    # where f is the measured signal frequency.
-    def lockin_period(self):
-        self.handle.write(b"window\n")
-        resp = self.wait_for(b"window")        
-        words = resp.split(b" ")
-        return float(words[1])/48e3 # samples/samplerate
-
-    # Get the lockin data
-    def get_lockin(self):
-        self.handle.write(b"lockin\n")
-        resp = self.wait_for(b"lcount")
-        words = resp.split(b" ")
-        count = int(words[1])
-        data = numpy.zeros((3,count))
-        for i in range(count):
-            resp = self.wait_for(b"ldata")
-            words = resp.split(b" ")
-            for j in range(3):
-                data[j][i] = float(words[j+1]);
-        resp = self.wait_for(b"lockin")        
-        words = resp.split(b" ")
-        return data
-
     # Set debug mode? Not really sure yet.
     def debug(self):
         self.handle.write(b"debug\n");
@@ -187,6 +133,18 @@ class Vibrating_Plate:
         self.handle.write(b"r_idle\n")
         resp = self.wait_for(b"r_idle")
         return b"true" == resp[7:11]
+
+    # Home the angular motor
+    def angular_home(self):
+        self.handle.write(b"a_home\n")
+        resp = self.wait_for(b"a_home")
+        return True
+
+    # Home the radial motor
+    def radial_home(self):
+        self.handle.write(b"r_home\n")
+        resp = self.wait_for(b"r_home")
+        return True
 
     # Sends both motors a given number of steps and waits until they're both
     # done moving
