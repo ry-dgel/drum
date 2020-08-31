@@ -45,7 +45,7 @@ class Vibrating_Plate:
         t.daemon = True
         t.start()
         self._debug_print("thread started")
-        while False == self.timeout_for(b"reset",timeout=1):
+        while False == self._timeout_for(b"reset",timeout=1):
             self._debug_print("resetting")
             self._handle.write(b"reset\n")
 
