@@ -11,7 +11,6 @@ import numpy as np
 import time
 from datetime import datetime
 
-#TODO Determine these values.
 ANG_MAX_STEPS = 720 # Number of steps that make a full circle
 ANG_MIN_STEPS = 0 # Initial steps in case we want a specific physical angle to be 0 in the future.
 
@@ -25,16 +24,16 @@ RAD_MIN_STEPS = 0 # Initial steps in case we want a specific radius to be 0.
 # Safe Vibrating Plate Control Class #
 ######################################
 class SafePlate(drum.Vibrating_Plate):
-    def __init__(self, debug=True):
+    def __init__(self, debug=True, shape="circle"):
         """ A safe wraper for controlling the vibrating plate lab.
             Everytime an instance is opened, the experiment is homed, this uses limit switches
-            to set the apparatus to it's (0,0) position.
+            to set the apparatus to its (0,0) position.
            
             Moving the equpiment is then done using safe functions.
 
             WARNING: You should have no reason to access and functions/fields prefixed 
                      with an underscore '_'. Python leaves these fully accessible and you can
-                     100% break the equipment if mess with them.
+                     100% break the equipment if you mess with them.
                      If you really think you need to for some fantastic new functionality that will 
                      make the experiment go better, please contact a TA/Prof first.
             
@@ -44,37 +43,42 @@ class SafePlate(drum.Vibrating_Plate):
             drum = sd.SafePlate()
             ```
             
-            This will print out some connection messages, and, assuming the device connects
+            This will print out some connection messages, and assuming the device connects
             properly, will home the instrument. If any errors occur during homing, a large
-            warning will be displayed, please watchout for that.
+            warning will be displayed, please watch-out for that.
             
             Once homed, you have control of the instrument.  The main moving function is
             `drum.move_abs(rad_steps, ang_steps)` which sets the scanner to an 
             absolute position defined by a radius and angle.
 
             Both numbers should be in number of steps for the motor with rough conversion:
-            1 Radial step ~ mm #TODO
+            1 Radial step ~ 0.01 mm
             1 Angular step ~ 0.5 degrees of rotaton.
 
             There are a bunch of wrappers to this motion function, allowing for relative 
             motion and cartesian coordinates. See those functions for more info.
 
+
         Parameters
         ----------
         debug : bool, optional
             Whether to print verbose debug messages, by default True
+        shape : str, optional
+            The shape of the plate in the apparatus. Can be one of 
+            "circle" or "square", by default circle.
         """
         super().__init__(debug)
         # Home the instrument on every startup, that way we are always at 0,0
         # from the beginning
         self.home()
+        self._shape = shape
         self._radial = RAD_MIN_STEPS
         self._angular = ANG_MIN_STEPS
 
-    def get_radial():
+    def get_radial(self):
         return self._radial
 
-    def get_angular():
+    def get_angular(self):
         return self._angular
 
     def home(self):
@@ -131,7 +135,7 @@ class SafePlate(drum.Vibrating_Plate):
         rad_steps = int(rad_steps)
         ang_steps = int(ang_steps)
 
-        if not safe_polar(rad_steps, ang_steps/2):
+        if not self.safe_polar(rad_steps, ang_steps/2):
             raise ValueError("Radial position %d outside safe range %d for angular steps %d" % 
                             (rad_steps, squine(ang_steps), ang_steps))
 
@@ -217,9 +221,8 @@ class SafePlate(drum.Vibrating_Plate):
         ----------
         steps : int
             The number of steps to actuate the motor.
-            # TODO: Check if these directions are correct:
-            Positive number indicates clockwise motion.
-            Negative number indicates counterclockwise motion.
+            Positive number indicates clockwise motion (looking from above).
+            Negative number indicates counterclockwise motion (looking from above).
         """
         self.move_rel(0, steps)
 
@@ -246,9 +249,8 @@ class SafePlate(drum.Vibrating_Plate):
             Negative number indicates backwards motion.
         ang_steps : int
             The number of steps to actuate the angular motor.
-            # TODO: Check if these directions are correct:
-            Positive number indicates clockwise motion.
-            Negative number indicates counterclockwise motion.
+            Positive number indicates clockwise motion (looking from above).
+            Negative number indicates counterclockwise motion (looking from above).
         """
         self.move_abs(self._radial + rad_steps, self._angular + ang_steps)
 
@@ -274,7 +276,7 @@ class SafePlate(drum.Vibrating_Plate):
         y = int(y)
         
         # Assert values are within range
-        if not safe_xy(x,y):
+        if not self.safe_xy(x,y):
             raise ValueError("Position (%d, %d) contains value outside safe range of %d-%d." % 
                               (x,y, -RAD_MAX_SAFE, RAD_MAX_STEPS))
 
@@ -313,6 +315,57 @@ class SafePlate(drum.Vibrating_Plate):
 
         self.cart_move_abs(new_x, new_y)
 
+    def safe_polar(self, radial, angular):
+        """ Returns true if the given polar coordinates are safe for the vibrating plate.
+            Tip: You can use this to filter a list of coordinates to ensure that no errors occur
+                while scanning through them.
+
+        Parameters
+        ----------
+        r : int or float
+            The radius of the given position. To be safe, this value must be within
+            the minimal safe radius, and the maximum safe radius for the given angle.
+        theta : int or float
+            The angle of the given position. This has no limitations as the angle
+            will be automatically wrapped if it exceeds a full turn.
+
+        Returns
+        -------
+        bool
+            Returns true if the position is safe, and false otherwise.
+        """
+        radial = int(round(r))
+        angular = int(round(angular))
+        if shape is "square":
+            return not (radial < RAD_MIN_STEPS or radial > squine(angular))
+        elif shape is "circle":
+            return not (radial < RAD_MIN_STEPS)
+
+    def safe_xy(self, x,y):
+        """ Returns true if the given cartesian coordinates are safe for the vibrating drum.
+            Tip: You can use this to filter a list of coordinates to ensure that no errors occur
+                while scanning through them.
+
+        Parameters
+        ----------
+        x : int or float
+            The x coordinate of the given position. To be safe this value must be 
+            within +/- the maximum safe radius
+        y : int or float
+            The y coordinate of the given position. To be safe this value must be 
+            within +/- the maximum safe radius
+
+        Returns
+        -------
+        bool
+            Returns true if the position is safe, and false otherwise.
+        """
+        if shape is "square":
+            checks = [(pos < -RAD_MAX_SAFE or pos > RAD_MAX_SAFE) for pos in [x,y]]
+            return not any(checks)
+        if shape is "circle":
+            r, theta = xy_to_polar(x,y)
+            return r <= RAD_MAX_SAFE
 ####################
 # Helper Functions #
 ####################
@@ -356,52 +409,6 @@ def polar_to_xy(r,theta):
     x = r * np.cos(theta)
     y = r * np.sin(theta)
     return x,y
-
-def safe_polar(r, theta):
-    """ Returns true if the given polar coordinates are safe for the vibrating drum.
-        Tip: You can use this to filter a list of coordinates to ensure that no errors occur
-             while scanning through them.
-
-    Parameters
-    ----------
-    r : int or float
-        The radius of the given position. To be safe, this value must be within
-        the minimal safe radius, and the maximum safe radius for the given angle.
-    theta : int or float
-        The angle of the given position. This has no limitations as the angle
-        will be automatically wrapped if it exceeds a full turn.
-
-    Returns
-    -------
-    bool        self._radial = RAD_MIN_STEPS
-        self._angular = ANG_MIN_STEPS
-        Returns true if the position is safe, and false otherwise.
-    """
-    radial = int(round(r))
-    angular = int(round(theta * 2))
-    return not (radial < RAD_MIN_STEPS or radial > squine(angular))
-
-def safe_xy(x,y):
-    """ Returns true if the given cartesian coordinates are safe for the vibrating drum.
-        Tip: You can use this to filter a list of coordinates to ensure that no errors occur
-             while scanning through them.
-
-    Parameters
-    ----------
-    x : int or float
-        The x coordinate of the given position. To be safe this value must be 
-        within +/- the maximum safe radius
-    y : int or float
-        The y coordinate of the given position. To be safe this value must be 
-        within +/- the maximum safe radius
-
-    Returns
-    -------
-    bool
-        Returns true if the position is safe, and false otherwise.
-    """
-    checks = [(pos < -RAD_MAX_SAFE or pos > RAD_MAX_SAFE) for pos in [x,y]]
-    return not any(checks)
 
 # For a given angle theta, max radial position is squine(theta)
 # Here's a function for getting that as a function of angular steps
