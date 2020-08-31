@@ -5,8 +5,8 @@
 # The order should be radial, angular for polar coordinates
 # and x,y for cartesian coordinates
 
-#import drum # For real use
-import dummy_drum as drum # For Testing
+import drum # For real use
+#import dummy_drum as drum # For Testing
 import numpy as np
 import time
 from datetime import datetime
@@ -15,10 +15,10 @@ from datetime import datetime
 ANG_MAX_STEPS = 720 # Number of steps that make a full circle
 ANG_MIN_STEPS = 0 # Initial steps in case we want a specific physical angle to be 0 in the future.
 
-RAD_MAX_STEPS = 10940 # Number of steps from the center to corner of plate
+RAD_MAX_STEPS = 10000 # Number of steps from the center to corner of plate
 # Since we're on a square. If the sensor is all the way in a corner, rotating
 # may result in a collision, so we need to be aware of these bounds.
-RAD_MAX_SAFE  = 8100 # Number of steps from center to edge of plate
+RAD_MAX_SAFE  = 7300 # Number of steps from center to edge of plate
 RAD_MIN_STEPS = 0 # Initial steps in case we want a specific radius to be 0.
 
 ######################################
@@ -82,10 +82,25 @@ class SafePlate(drum.Vibrating_Plate):
             This defines the minimal position of the scanner along both axes.
         """
         print("Homing Instrument, please wait")
-        self._angular_home()
-        self._radial_home()
+        r_status = self.radial_home()
+        a_status = self.angular_home()
+        
+        self.radial = RAD_MIN_STEPS
+        self.angular = ANG_MIN_STEPS
+        if not (r_status and a_status):
+            if r_status:
+                print("Radial Switch Failed.")
+            if a_status:
+                print("Angular Switch Failed.")
+            print("!!!!!!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!!!!!!")
+            print("Homing Failed, please check the camera and contact technician if needed.")
+            print("If the radial switch is obviously not engadged, try running home() again.")
+            print("Otherwise, immediatly get help and do not run any other commands.")
+            print("!!!!!!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!!!!!!")
+            input("Press Enter to acknowledge this message...")
 
-        print("Done Homing")
+        else:
+            print("Homing Completed Succesfuly.")
 
     def move_abs(self, rad_steps, ang_steps):
         """ Steps the radial and angular motors to the position given by their respective
@@ -162,7 +177,7 @@ class SafePlate(drum.Vibrating_Plate):
             self._radial_go(rad_delta)
 
         # Wait for all movement to stop.
-        while not (self._radial_idle() and self._angular_idle()):
+        while not (self._radial_idle() or self._angular_idle()):
             time.sleep(0.1)
 
         # Register the new changes

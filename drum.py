@@ -24,8 +24,8 @@ class Vibrating_Plate:
         self.handle = False
         self.debug = debug
         
-        # Attemp to open device by trying all COM ports
-        for i in range(2,10):
+        # Attemp to open device by trying all COM ports from 5 to 10
+        for i in range(5,10):
             try:
                 device = "COM%d" % (i)
                 if self.D_OPEN & self.debug: print("Attempting '%s'"%(device))
@@ -141,13 +141,20 @@ class Vibrating_Plate:
     # Home the angular motor
     def _angular_home(self):
         self.handle.write(b"a_home\n")
-        resp = self.wait_for(b"a_home")
+        self.wait_for(b"a_home")
+        resp = self.wait_for(b"HOMING").decode('ascii')
+        print(resp)
+        if "FAILED." in resp.split(" "):
+            return False
         return True
 
     # Home the radial motor
     def _radial_home(self):
         self.handle.write(b"r_home\n")
-        resp = self.wait_for(b"r_home")
+        self.wait_for(b"r_home")
+        resp = self.wait_for(b"HOMING").decode('ascii')
+        if "FAILED." in resp.split(" "):
+            return False
         return True
 
     # Sends both motors a given number of steps and waits until they're both
