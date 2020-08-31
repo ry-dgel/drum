@@ -139,7 +139,7 @@ class SafePlate(drum.Vibrating_Plate):
                 raise ValueError("Radial position %d outside safe range %d for angular steps %d" % 
                                  (rad_steps, squine(ang_steps), ang_steps))
             if shape is "circle":
-                raise ValueError("Radial position %d outside safe range %d % 
+                raise ValueError("Radial position %d outside safe range %d" %
                                  (rad_steps, RAD_MAX_SAFE))
 
         # Take absolute position around single rotation of circle
