@@ -44,13 +44,13 @@ class Vibrating_Plate:
         t = threading.Thread(target=self._reader)
         t.daemon = True
         t.start()
-        self.debug_print("thread started")
+        self._debug_print("thread started")
         while False == self.timeout_for(b"reset",timeout=1):
-            self.debug_print("resetting")
+            self._debug_print("resetting")
             self._handle.write(b"reset\n")
 
     def _reader(self):
-        self.debug_print("reader starts")
+        self._debug_print("reader starts")
         while True:
             str = self._handle.readline()
             self._queue.put(str)
@@ -60,13 +60,13 @@ class Vibrating_Plate:
         while True:
             try:
                 resp = self._queue.get(block=True,timeout=timeout)
-                self.debug_print("after get")
+                self._debug_print("after get")
                 self._queue.task_done()
                 rc = resp.find(str)  
                 if 0 == rc : return resp
                 print("UnMatched: %s" % (resp.decode()))
             except queue.Empty:
-                self.debug_print("exception")
+                self._debug_print("exception")
                 return False
 
     # Wait for message matching "str" with no max time
