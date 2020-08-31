@@ -134,37 +134,41 @@ class SafePlate(drum.Vibrating_Plate):
         # Ensure integers, or integer like numbers are passed
         rad_steps = int(rad_steps)
         ang_steps = int(ang_steps)
-
         if not self.safe_polar(rad_steps, ang_steps/2):
-            raise ValueError("Radial position %d outside safe range %d for angular steps %d" % 
-                            (rad_steps, squine(ang_steps), ang_steps))
+            if shape is "square":
+                raise ValueError("Radial position %d outside safe range %d for angular steps %d" % 
+                                 (rad_steps, squine(ang_steps), ang_steps))
+            if shape is "circle":
+                raise ValueError("Radial position %d outside safe range %d % 
+                                 (rad_steps, RAD_MAX_SAFE))
 
         # Take absolute position around single rotation of circle
         ang_delta = (ang_steps % ANG_MAX_STEPS) - self._angular
         
-        # Flags that modify how the motion should be handled
-        retreat = False
-        ang_first = False
-        # If the radius is outside the safe range and we're rotating
-        # we need to first pull in the sensor, then do the rotation
-        # and finally set the radius to the correct amount.
-        safe_dists = squine(np.linspace(self._angular,ang_steps,np.abs(self._angular-ang_steps)+1,dtype=int))
-        safe_dist = np.min(safe_dists)
-        if (ang_delta != 0 and self._radial > safe_dist):
-            retreat = True
-        # If we're moving outside the safe radial distance, we want to rotate first.
-        if (rad_steps > RAD_MAX_SAFE):
-            ang_first = True
+        if shape is "square":
+            # Flags that modify how the motion should be handled
+            retreat = False
+            ang_first = False
+            # If the radius is outside the safe range and we're rotating
+            # we need to first pull in the sensor, then do the rotation
+            # and finally set the radius to the correct amount.
+            safe_dists = squine(np.linspace(self._angular,ang_steps,np.abs(self._angular-ang_steps)+1,dtype=int))
+            safe_dist = np.min(safe_dists)
+            if (ang_delta != 0 and self._radial > safe_dist):
+                retreat = True
+            # If we're moving outside the safe radial distance, we want to rotate first.
+            if (rad_steps > RAD_MAX_SAFE):
+                ang_first = True
 
-        # If we're past the safe rotating radius, pull the radius in.
-        if retreat:
-            self._debug_print("Retreating radius for rotation by %d steps" % ang_delta)
-            # If the target radius is within the safe limit, go there
-            # otherwise, move to the minimum safe distance.
-            self.rad_move_abs(safe_dist)
-        # Calculate number of steps needed to move radially.
-        # Put here since retreating will change this.
-        rad_delta = rad_steps - self._radial
+            # If we're past the safe rotating radius, pull the radius in.
+            if retreat:
+                self._debug_print("Retreating radius for rotation by %d steps" % ang_delta)
+                # If the target radius is within the safe limit, go there
+                # otherwise, move to the minimum safe distance.
+                self.rad_move_abs(safe_dist)
+            # Calculate number of steps needed to move radially.
+            # Put here since retreating will change this.
+            rad_delta = rad_steps - self._radial
 
         self._debug_print("Moving to %d, %d" % (self._radial + rad_delta, self._angular + ang_delta))
 
