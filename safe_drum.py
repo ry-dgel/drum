@@ -166,9 +166,9 @@ class SafePlate(drum.Vibrating_Plate):
                 # If the target radius is within the safe limit, go there
                 # otherwise, move to the minimum safe distance.
                 self.rad_move_abs(safe_dist)
-            # Calculate number of steps needed to move radially.
-            # Put here since retreating will change this.
-            rad_delta = rad_steps - self._radial
+        # Calculate number of steps needed to move radially.
+        # Put here since retreating will change this.
+        rad_delta = rad_steps - self._radial
 
         self._debug_print("Moving to %d, %d" % (self._radial + rad_delta, self._angular + ang_delta))
 
