@@ -70,10 +70,10 @@ class SafePlate(drum.Vibrating_Plate):
         super().__init__(debug)
         # Home the instrument on every startup, that way we are always at 0,0
         # from the beginning
-        self.home()
-        self._shape = shape
         self._radial = RAD_MIN_STEPS
         self._angular = ANG_MIN_STEPS
+        self.home()
+        self._shape = shape
 
     def get_radial(self):
         return self._radial
@@ -91,8 +91,7 @@ class SafePlate(drum.Vibrating_Plate):
         r_status = self._radial_home()
         a_status = self._angular_home()
         
-        self._radial = RAD_MIN_STEPS
-        self._angular = ANG_MIN_STEPS
+
         if not (r_status and a_status):
             if r_status:
                 print("Radial Switch Failed.")
@@ -100,12 +99,14 @@ class SafePlate(drum.Vibrating_Plate):
                 print("Angular Switch Failed.")
             print("!!!!!!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!!!!!!")
             print("Homing Failed, please check the camera and contact technician if needed.")
-            print("If the radial switch is obviously not engadged, try running home() again.")
+            print("If the radial switch is obviously not engadged, run home() again.")
             print("Otherwise, immediatly get help and do not run any other commands.")
             print("!!!!!!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!!!!!!")
             input("Press Enter to acknowledge this message...")
 
         else:
+            self._radial = RAD_MIN_STEPS
+            self._angular = ANG_MIN_STEPS
             print("Homing Completed Succesfuly.")
 
     def move_abs(self, rad_steps, ang_steps):
