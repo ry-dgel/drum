@@ -86,7 +86,7 @@ class SafePlate(drum.Vibrating_Plate):
             This defines the minimal position of the scanner along both axes.
         """
         if self.get_angular() > 710:
-            drum.move_abs(self.get_radial(), 710)
+            self.move_abs(self.get_radial(), 710)
         print("Homing Instrument, please wait")
         r_status = self._radial_home()
         a_status = self._angular_home()
