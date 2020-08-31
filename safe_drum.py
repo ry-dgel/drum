@@ -284,8 +284,11 @@ class SafePlate(drum.Vibrating_Plate):
         
         # Assert values are within range
         if not self.safe_xy(x,y):
-            raise ValueError("Position (%d, %d) contains value outside safe range of %d-%d." % 
-                              (x,y, -RAD_MAX_SAFE, RAD_MAX_STEPS))
+            if self._shape is "square":
+                raise ValueError("Position (%d, %d) contains value outside safe range of %d-%d." % 
+                                (x,y, -RAD_MAX_SAFE, RAD_MAX_SAFE))
+                raise ValueError("Position (%d, %d) produces radius %d outside limit of %d." % 
+                                (x,y, int(round(np.sqrt(x**2+y**2))), RAD_MAX_SAFE))
 
         # Convert x,y to r,theta
         r,theta = xy_to_polar(x,y)
