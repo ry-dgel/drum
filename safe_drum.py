@@ -1,8 +1,12 @@
 # Safe control code
 # Written by Rigel Zifkin 2020-08-09
 
-import drum # For real use
-#import dummy_drum as drum # For Testing
+# By convention any time both positions are used in a single line
+# The order should be radial, angular for polar coordinates
+# and x,y for cartesian coordinates
+
+#import drum # For real use
+import dummy_drum as drum # For Testing
 import numpy as np
 import time
 from datetime import datetime
@@ -17,71 +21,71 @@ RAD_MAX_STEPS = 10940 # Number of steps from the center to corner of plate
 RAD_MAX_SAFE  = 8100 # Number of steps from center to edge of plate
 RAD_MIN_STEPS = 0 # Initial steps in case we want a specific radius to be 0.
 
-# By convention any time both positions are used in a single line
-# The order should be radial, angular
+######################################
+# Safe Vibrating Plate Control Class #
+######################################
 class SafePlate(drum.Vibrating_Plate):
     def __init__(self, debug=True):
+        """ A safe wraper for controlling the vibrating plate lab.
+            Everytime an instance is opened, the experiment is homed, this uses limit switches
+            to set the apparatus to it's (0,0) position.
+           
+            Moving the equpiment is then done using safe functions.
+
+            WARNING: You should have no reason to access and functions/fields prefixed 
+                     with an underscore '_'. Python leaves these fully accessible and you can
+                     100% break the equipment if mess with them.
+                     If you really think you need to for some fantastic new functionality that will 
+                     make the experiment go better, please contact a TA/Prof first.
+            
+            To initialize, simply define a new drum object:
+            ```
+            import safe_drum as sd
+            drum = sd.SafePlate()
+            ```
+            
+            This will print out some connection messages, and, assuming the device connects
+            properly, will home the instrument. If any errors occur during homing, a large
+            warning will be displayed, please watchout for that.
+            
+            Once homed, you have control of the instrument.  The main moving function is
+            `drum.move_abs(rad_steps, ang_steps)` which sets the scanner to an 
+            absolute position defined by a radius and angle.
+
+            Both numbers should be in number of steps for the motor with rough conversion:
+            1 Radial step ~ mm #TODO
+            1 Angular step ~ 0.5 degrees of rotaton.
+
+            There are a bunch of wrappers to this motion function, allowing for relative 
+            motion and cartesian coordinates. See those functions for more info.
+
+        Parameters
+        ----------
+        debug : bool, optional
+            Whether to print verbose debug messages, by default True
+        """
         super().__init__(debug)
+        # Home the instrument on every startup, that way we are always at 0,0
+        # from the beginning
         self.home()
+        self._radial = RAD_MIN_STEPS
+        self._angular = ANG_MIN_STEPS
 
-    def write_position(self):
-        """ Writes the position to a file (position.csv) with a date and time.
-            For tracking the position between initializations of the code.
-            Will warn if it can't access the working directory.
-        """
-        try:
-            f = open("position.csv", 'w')
-        except PermissionError:
-            print("""Could not write position to file, make sure you're 
-                     running this from a directory in which you have write access.""")
-        now = datetime.now()
-        f.write("#Previous drumhead position on %s\n" % now.strftime("%Y/%m/%d %H:%M:%S"))
-        f.write("#Radial, Angular\n")
-        f.write("%d, %d" % (self.radial, self.angular))
+    def get_radial():
+        return self._radial
 
-    def read_position(self):
-        """ Reads the previous location of the scanner from a file (position.csv).
-            If the file does not exist, or can't be read, it will default to 0,0.
-            In this case, it remind the user to home the scanner.
-        """
-        # Initialize default position
-        pos = [0,0]
-        try:
-            # Read from the file
-            pos = np.genfromtxt("position.csv", delimiter=',', skip_header = 2, dtype=np.intc)
-        except (FileNotFoundError, OSError):
-            print("No position file found. Position set to 0,0. Consider running drum.home().")
-
-        # Return the radius, and angle
-        return pos[0],pos[1]
+    def get_angular():
+        return self._angular
 
     def home(self):
         """ Moves the radius and angular motor backwards until they hit the limit switches.
             This defines the minimal position of the scanner along both axes.
         """
         print("Homing Instrument, please wait")
-        self.angular_home()
-        self.radial_home()
-        idx = 0
-        while(not (self.angular_idle or self.radial_idle)):
-            time.sleep(0.1)
-            char = ['-',"\\",'|','/'][idx % 4]
-            print(char, end='\r')
-        self.radial = RAD_MIN_STEPS
-        self.angular = ANG_MIN_STEPS
+        self._angular_home()
+        self._radial_home()
+
         print("Done Homing")
-
-    def read_limits(self):
-        """Reads the status of the radial and angular limit switch.
-
-        Returns
-        -------
-        bool, bool
-            Status of the radial and limit switch respectively.
-            True indicat/ies that the switch is depressed.
-        """
-        #TODO
-        return False,False
 
     def move_abs(self, rad_steps, ang_steps):
         """ Steps the radial and angular motors to the position given by their respective
@@ -112,17 +116,12 @@ class SafePlate(drum.Vibrating_Plate):
         rad_steps = int(rad_steps)
         ang_steps = int(ang_steps)
 
-        # Assert radial position is within limits
-        if (rad_steps < RAD_MIN_STEPS or rad_steps > RAD_MAX_STEPS):
-            raise ValueError("Angular position %d outside range of %d-%d." % 
-                            (rad_steps, RAD_MIN_STEPS, RAD_MAX_STEPS))
-
-        if (rad_steps > squine(ang_steps)):
-            raise ValueError("Radial position %d outside safe range %d for angle %d" % 
+        if not safe_polar(rad_steps, ang_steps/2):
+            raise ValueError("Radial position %d outside safe range %d for angular steps %d" % 
                             (rad_steps, squine(ang_steps), ang_steps))
 
         # Take absolute position around single rotation of circle
-        ang_delta = (ang_steps % ANG_MAX_STEPS) - self.angular
+        ang_delta = (ang_steps % ANG_MAX_STEPS) - self._angular
         
         # Flags that modify how the motion should be handled
         retreat = False
@@ -130,9 +129,9 @@ class SafePlate(drum.Vibrating_Plate):
         # If the radius is outside the safe range and we're rotating
         # we need to first pull in the sensor, then do the rotation
         # and finally set the radius to the correct amount.
-        safe_dists = squine(np.linspace(self.angular,ang_steps,np.abs(self.angular-ang_steps)+1,dtype=int))
+        safe_dists = squine(np.linspace(self._angular,ang_steps,np.abs(self._angular-ang_steps)+1,dtype=int))
         safe_dist = np.min(safe_dists)
-        if (ang_delta != 0 and self.radial > safe_dist):
+        if (ang_delta != 0 and self._radial > safe_dist):
             retreat = True
         # If we're moving outside the safe radial distance, we want to rotate first.
         if (rad_steps > RAD_MAX_SAFE):
@@ -140,37 +139,36 @@ class SafePlate(drum.Vibrating_Plate):
 
         # If we're past the safe rotating radius, pull the radius in.
         if retreat:
-            self.debug_print("Retreating radius for rotation by %d steps" % ang_delta)
+            self._debug_print("Retreating radius for rotation by %d steps" % ang_delta)
             # If the target radius is within the safe limit, go there
             # otherwise, move to the minimum safe distance.
             self.rad_move_abs(safe_dist)
         # Calculate number of steps needed to move radially.
         # Put here since retreating will change this.
-        rad_delta = rad_steps - self.radial
+        rad_delta = rad_steps - self._radial
 
-        self.debug_print("Moving to %d, %d" % (self.radial + rad_delta, self.angular + ang_delta))
+        self._debug_print("Moving to %d, %d" % (self._radial + rad_delta, self._angular + ang_delta))
 
         # If there is motion to do, send the motors that number of steps
         # and wait until idle.
         if ang_delta != 0:
-            self.angular_go(ang_delta)
+            self._angular_go(ang_delta)
             # If we need the angular motion to finish before the radial motion starts, wait here.
             if ang_first:
-                self.debug_print("Rotating Angle First")
-                while not self.angular_idle():
+                self._debug_print("Rotating Angle First")
+                while not self._angular_idle():
                     time.sleep(0.1)
         if rad_delta != 0:
-            self.radial_go(rad_delta)
+            self._radial_go(rad_delta)
 
         # Wait for all movement to stop.
-        while not (self.radial_idle() and self.angular_idle()):
+        while not (self._radial_idle() and self._angular_idle()):
             time.sleep(0.1)
 
         # Register the new changes
-        self.angular += ang_delta
-        self.radial += rad_delta
-        self.write_position()
-        self.debug_print("%d, %d" % (self.radial, self.angular))
+        self._angular += ang_delta
+        self._radial += rad_delta
+        self._debug_print("Final Position: %d, %d" % (self._radial, self._angular))
 
     def rad_move_rel(self, steps):
         """ Step the radial motor by a given number of steps.
@@ -194,7 +192,7 @@ class SafePlate(drum.Vibrating_Plate):
         steps : int
             The position in steps, relative to zerodrum to move the radial position to.
         """
-        self.move_abs(steps, self.angular)
+        self.move_abs(steps, self._angular)
 
     def ang_move_rel(self, steps):
         """ Step the angular motor by a given number of steps.  
@@ -219,7 +217,7 @@ class SafePlate(drum.Vibrating_Plate):
         steps : int
             The position in steps, relative to zero to move the angular position to.
         """
-        self.move_abs(self.radial, steps)
+        self.move_abs(self._radial, steps)
 
     def move_rel(self, rad_steps, ang_steps):
         """Step the radial and angular motor by a given number of steps.  
@@ -237,21 +235,173 @@ class SafePlate(drum.Vibrating_Plate):
             Positive number indicates clockwise motion.
             Negative number indicates counterclockwise motion.
         """
-        self.move_abs(self.radial + rad_steps, self.angular + ang_steps)
+        self.move_abs(self._radial + rad_steps, self._angular + ang_steps)
 
-    
+    def cart_move_abs(self, x, y):
+        """ Steps the radial and angular motors to a cartesian position (x,y).
+            This is done by converting the x and y values to polar coordinates,
+            so it may result in slightly different positions due to rounding.
+
+        Parameters
+        ----------
+        x : int
+            The position in steps along the x axis to posotion the sensor.
+        y : int 
+            The position in steps along the y axis to posotion the sensor.
+        Raises
+        ------
+        ValueError
+            Will return an error if the given coordinates are outisde the range set
+            by +/- the maximum safe radius.
+        """
+        # Ensure integers, or integer like numbers are passed
+        x = int(x)
+        y = int(y)
+        
+        # Assert values are within range
+        if not safe_xy(x,y):
+            raise ValueError("Position (%d, %d) contains value outside safe range of %d-%d." % 
+                              (x,y, -RAD_MAX_SAFE, RAD_MAX_STEPS))
+
+        # Convert x,y to r,theta
+        r,theta = xy_to_polar(x,y)
+        # Convert to steps
+        # This will probably introduce some rounding error...
+        radial = int(round(r))
+        angular = int(round(theta * 2))
+
+        self.move_abs(radial, angular)
+
+    def cart_move_rel(self, x, y):
+        """ Steps the radial and angular motors to move relative to the current position a number
+            of steps given (x,y) in cartesian coordinates. 
+            This requires converting the current position to cartesian, calculating the new
+            position and converting back to polar, and will likely result in a slightly different
+            position due to rounding. 
+
+        Parameters
+        ----------
+        x : int
+            The number of steps to move along the x-axis
+        y : int
+            The number of steps to move along the y-axis
+        """
+        # Get current position in cartesian
+        x_cur, y_cur = polar_to_xy(self._radial, self._angular/2)
+        # This will probably introduce some rounding error...
+        x_cur = int(round(x_cur))
+        y_cur = int(round(y_cur))
+
+        # Compute new absolute cartesian coordinates
+        new_x = x + x_cur
+        new_y = y + y_cur
+
+        self.cart_move_abs(new_x, new_y)
+
+####################
+# Helper Functions #
+####################
+def xy_to_polar(x,y):
+    """ Converts a set of cartesian coordinates (x,y) into their polar counterparts (r,theta).
+        By convention this will return (0,0) when the input is (0,0) keep that in mind as it may lead
+        to interesting behaviour when scanning through cartesian coordinates.
+        For more info, read numpy's arctan2 documentation.
+
+    Parameters
+    ----------
+    x : int or float
+        The x coordinate.
+    y : int or float
+        the y coordinate.
+
+    Returns
+    -------
+    float,float
+        The corresponding polar coordinates.
+    """
+    r = np.sqrt(x**2 + y**2)
+    theta = np.degrees(np.arctan2(y,x))
+    return r,theta
+
+def polar_to_xy(r,theta):
+    """ Converts a set of polar coordinates (r,theta) into their cartesian counterparts (x,y).
+
+    Parameters
+    ----------
+    r : int or float
+        The radius coordinate.
+    theta : int or float
+        The angle coordinate.
+
+    Returns
+    -------
+    float, float
+        The corresponding cartesian coordinates.
+    """
+    x = r * np.cos(theta)
+    y = r * np.sin(theta)
+    return x,y
+
+def safe_polar(r, theta):
+    """ Returns true if the given polar coordinates are safe for the vibrating drum.
+        Tip: You can use this to filter a list of coordinates to ensure that no errors occur
+             while scanning through them.
+
+    Parameters
+    ----------
+    r : int or float
+        The radius of the given position. To be safe, this value must be within
+        the minimal safe radius, and the maximum safe radius for the given angle.
+    theta : int or float
+        The angle of the given position. This has no limitations as the angle
+        will be automatically wrapped if it exceeds a full turn.
+
+    Returns
+    -------
+    bool        self._radial = RAD_MIN_STEPS
+        self._angular = ANG_MIN_STEPS
+        Returns true if the position is safe, and false otherwise.
+    """
+    radial = int(round(r))
+    angular = int(round(theta * 2))
+    return not (radial < RAD_MIN_STEPS or radial > squine(angular))
+
+def safe_xy(x,y):
+    """ Returns true if the given cartesian coordinates are safe for the vibrating drum.
+        Tip: You can use this to filter a list of coordinates to ensure that no errors occur
+             while scanning through them.
+
+    Parameters
+    ----------
+    x : int or float
+        The x coordinate of the given position. To be safe this value must be 
+        within +/- the maximum safe radius
+    y : int or float
+        The y coordinate of the given position. To be safe this value must be 
+        within +/- the maximum safe radius
+
+    Returns
+    -------
+    bool
+        Returns true if the position is safe, and false otherwise.
+    """
+    checks = [(pos < -RAD_MAX_SAFE or pos > RAD_MAX_SAFE) for pos in [x,y]]
+    return not any(checks)
 
 # For a given angle theta, max radial position is squine(theta)
 # Here's a function for getting that as a function of angular steps
 # Not good enough since the sensor has some width to it.
-# For now gonna try multiplying by 0.94 + 0.06 * cos^2(theta)
-# To smoothly go through each regime.
+# For now gonna try multiplying by (0.91 + 0.09 * cos(2*theta)**2) in order
+# to smoothly go from edge at angle 0 to corner at angle 45.
 def squine(angular):
     """Calculates the absolute maximum radius for a given angular (in steps) position.
        This is effectively the distance between the center of a square and it's perimiter
        at a given angle. 
        As a multiple of half the square's width, for an edge it's exactly 1, 
-       for the exact corner it's sqrt(2).
+       for the exact corner it's sqrt(2). 
+       Since the sensor is not a zero-size point, it's width must also be considered.
+       This is handled by a multiplicative factor of (0.91 + 0.09 * np.cos(2*theta)**2), which
+       reduces the calculated squine value by a factor of 0.91 at the corner to 1.0 at the edge.
 
     Parameters
     ----------
@@ -272,11 +422,16 @@ def squine(angular):
 
 # Testing will remove
 if __name__ == "__main__":
-    drum = SafePlate()
+    plate = SafePlate()
+    # Test Polar Bounds
     for i in range(0,365,5):
         print(i)
-        drum.move_abs(squine(i),i)
-    drum.move_abs(0,0)
+        plate.move_abs(squine(i),i)
+    # Test Cartesian Bounds
+    for i in range(-7000,7200,200):
+        print(i)
+        plate.cart_move_abs(i,i)
+    plate.move_abs(0,0)
 """
     
     # Set position to 0, 0
