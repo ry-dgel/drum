@@ -135,17 +135,17 @@ class SafePlate(drum.Vibrating_Plate):
         rad_steps = int(rad_steps)
         ang_steps = int(ang_steps)
         if not self.safe_polar(rad_steps, ang_steps/2):
-            if shape is "square":
+            if self._shape is "square":
                 raise ValueError("Radial position %d outside safe range %d for angular steps %d" % 
                                  (rad_steps, squine(ang_steps), ang_steps))
-            if shape is "circle":
+            if self._shape is "circle":
                 raise ValueError("Radial position %d outside safe range %d" %
                                  (rad_steps, RAD_MAX_SAFE))
 
         # Take absolute position around single rotation of circle
         ang_delta = (ang_steps % ANG_MAX_STEPS) - self._angular
         
-        if shape is "square":
+        if self._shape is "square":
             # Flags that modify how the motion should be handled
             retreat = False
             ang_first = False
@@ -338,11 +338,11 @@ class SafePlate(drum.Vibrating_Plate):
         bool
             Returns true if the position is safe, and false otherwise.
         """
-        radial = int(round(r))
+        radial = int(round(radial))
         angular = int(round(angular))
-        if shape is "square":
+        if self._shape is "square":
             return not (radial < RAD_MIN_STEPS or radial > squine(angular))
-        elif shape is "circle":
+        elif self._shape is "circle":
             return not (radial < RAD_MIN_STEPS)
 
     def safe_xy(self, x,y):
@@ -364,10 +364,10 @@ class SafePlate(drum.Vibrating_Plate):
         bool
             Returns true if the position is safe, and false otherwise.
         """
-        if shape is "square":
+        if self._shape is "square":
             checks = [(pos < -RAD_MAX_SAFE or pos > RAD_MAX_SAFE) for pos in [x,y]]
             return not any(checks)
-        if shape is "circle":
+        if self._shape is "circle":
             r, theta = xy_to_polar(x,y)
             return r <= RAD_MAX_SAFE
 ####################
