@@ -82,11 +82,11 @@ class SafePlate(drum.Vibrating_Plate):
             This defines the minimal position of the scanner along both axes.
         """
         print("Homing Instrument, please wait")
-        r_status = self.radial_home()
-        a_status = self.angular_home()
+        r_status = self._radial_home()
+        a_status = self._angular_home()
         
-        self.radial = RAD_MIN_STEPS
-        self.angular = ANG_MIN_STEPS
+        self._radial = RAD_MIN_STEPS
+        self._angular = ANG_MIN_STEPS
         if not (r_status and a_status):
             if r_status:
                 print("Radial Switch Failed.")
