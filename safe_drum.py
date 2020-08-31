@@ -144,7 +144,7 @@ class SafePlate(drum.Vibrating_Plate):
 
         # Take absolute position around single rotation of circle
         ang_delta = (ang_steps % ANG_MAX_STEPS) - self._angular
-        
+        ang_first = False
         if self._shape is "square":
             # Flags that modify how the motion should be handled
             retreat = False
